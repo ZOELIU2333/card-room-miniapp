@@ -1,0 +1,115 @@
+import { describe, it, expect } from 'vitest'
+import { WsGateway } from './gateway'
+import { FakeSocket } from './socket'
+import { StubAuthenticator } from './auth'
+import { RoomManager } from '../room/manager'
+import { PaodekuaiEngine } from '../engine/paodekuai/engine'
+import { InMemorySnapshotStore } from '../room/snapshot'
+import { realScheduler } from '../room/timer'
+import type { ServerMessage } from '../room/transport'
+
+function seededRandom(seed: number): () => number {
+  let s = seed >>> 0
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xffffffff }
+}
+
+function makeGateway() {
+  const store = new InMemorySnapshotStore()
+  const gateway = new WsGateway({ authenticator: new StubAuthenticator() })
+  const manager = new RoomManager({
+    engine: new PaodekuaiEngine(),
+    transport: gateway, // gateway 实现 Transport
+    store,
+    scheduler: realScheduler,
+    capacity: 3,
+    turnMs: 30000,
+    rngFor: () => seededRandom(123),
+  })
+  gateway.attachRoomManager(manager)
+  return { gateway, manager }
+}
+
+function lastMsg(s: FakeSocket, type: string): ServerMessage | undefined {
+  const parsed = s.sent.map((t) => JSON.parse(t) as ServerMessage).filter((m) => m.type === type)
+  return parsed[parsed.length - 1]
+}
+
+describe('WsGateway routing', () => {
+  it('rejects non-AUTH before authentication', async () => {
+    const { gateway } = makeGateway()
+    const s = new FakeSocket()
+    gateway.handleConnection(s)
+    s.receive(JSON.stringify({ type: 'JOIN', payload: { roomId: 'r1' } }))
+    await gateway.idle()
+    const rej = lastMsg(s, 'REJECTED')
+    expect((rej?.payload as { reason: string }).reason).toBe('NOT_AUTHED')
+  })
+
+  it('AUTH then CREATE puts the player in a room', async () => {
+    const { gateway } = makeGateway()
+    const s = new FakeSocket()
+    gateway.handleConnection(s)
+    s.receive(JSON.stringify({ type: 'AUTH', payload: { code: 'p1' } }))
+    s.receive(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1' } }))
+    await gateway.idle()
+    expect(lastMsg(s, 'REJECTED')).toBeUndefined()
+  })
+
+  it('three players AUTH+JOIN start a game; each gets a private STATE', async () => {
+    const { gateway } = makeGateway()
+    const socks: FakeSocket[] = []
+    for (const id of ['p1','p2','p3']) {
+      const s = new FakeSocket(); socks.push(s)
+      gateway.handleConnection(s)
+      s.receive(JSON.stringify({ type: 'AUTH', payload: { code: id } }))
+      s.receive(JSON.stringify({ type: id === 'p1' ? 'CREATE' : 'JOIN', payload: { roomId: 'r1' } }))
+      await gateway.idle()
+    }
+    for (const s of socks) {
+      const state = lastMsg(s, 'STATE')
+      expect(state).toBeDefined()
+      const view = state!.payload as { you: { hand: unknown[] } }
+      expect(view.you.hand.length).toBe(16)
+    }
+  })
+
+  it('rejects PLAY before joining a room', async () => {
+    const { gateway } = makeGateway()
+    const s = new FakeSocket()
+    gateway.handleConnection(s)
+    s.receive(JSON.stringify({ type: 'AUTH', payload: { code: 'p1' } }))
+    s.receive(JSON.stringify({ type: 'PLAY', payload: { cards: [{ rank: '3', suit: 'D' }] } }))
+    await gateway.idle()
+    expect((lastMsg(s, 'REJECTED')?.payload as { reason: string }).reason).toBe('NOT_IN_ROOM')
+  })
+
+  it('reconnect: same playerId AUTH+RESUME re-pushes current state to new socket', async () => {
+    const { gateway } = makeGateway()
+    const socks: Record<string, FakeSocket> = {}
+    for (const id of ['p1','p2','p3']) {
+      const s = new FakeSocket(); socks[id] = s
+      gateway.handleConnection(s)
+      s.receive(JSON.stringify({ type: 'AUTH', payload: { code: id } }))
+      s.receive(JSON.stringify({ type: id === 'p1' ? 'CREATE' : 'JOIN', payload: { roomId: 'r1' } }))
+      await gateway.idle()
+    }
+    socks['p1']!.close()
+    const s2 = new FakeSocket()
+    gateway.handleConnection(s2)
+    s2.receive(JSON.stringify({ type: 'AUTH', payload: { code: 'p1' } }))
+    s2.receive(JSON.stringify({ type: 'RESUME', payload: {} }))
+    await gateway.idle()
+    const state = lastMsg(s2, 'STATE')
+    expect(state).toBeDefined()
+    expect((state!.payload as { you: { hand: unknown[] } }).you.hand.length).toBe(16)
+  })
+
+  it('bad message yields BAD_MESSAGE and does not crash', async () => {
+    const { gateway } = makeGateway()
+    const s = new FakeSocket()
+    gateway.handleConnection(s)
+    s.receive('garbage{')
+    await gateway.idle()
+    expect((lastMsg(s, 'REJECTED')?.payload as { reason: string }).reason).toBe('BAD_MESSAGE')
+  })
+})
