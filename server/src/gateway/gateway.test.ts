@@ -133,26 +133,18 @@ describe('WsGateway routing', () => {
     const rej = lastMsg(s4, 'REJECTED')
     expect(rej).toBeDefined()
     expect(['ROOM_FULL','ALREADY_STARTED']).toContain((rej!.payload as { reason: string }).reason)
-    const sentCountAfterReject = s4.sent.length
-    // a subsequent broadcast (triggered by p1 timing out → autoplay → STATE) must NOT reach p4
-    // simulate a turn advance by sending p4 a PLAY — must be NOT_IN_ROOM, proving p4 is not seated
+    // p4 must not be seated: a subsequent PLAY is NOT_IN_ROOM, proving the rejected join
+    // did not commit membership (and thus p4 receives no room broadcasts).
     s4.receive(JSON.stringify({ type: 'PLAY', payload: { cards: [{ rank: '3', suit: 'D' }] } }))
     await gateway.idle()
     expect((lastMsg(s4, 'REJECTED')!.payload as { reason: string }).reason).toBe('NOT_IN_ROOM')
   })
 
-  it('feeds pong events to an attached heartbeat so a live connection survives', async () => {
+  it('a pong on a connection is handled without error when no heartbeat is attached', async () => {
     const { gateway } = makeGateway()
-    // fake interval scheduler: single repeatable callback
-    let cb: (() => void) | null = null
-    const sched = { set(fn: () => void, _ms: number) { cb = fn; return 1 }, clear() { cb = null } }
-    // import Heartbeat + ConnectionRegistry indirectly: construct via gateway internals is not exposed,
-    // so build a standalone Heartbeat over the gateway's registry is also not exposed.
-    // Instead, assert the wiring via a Heartbeat the test owns is out of scope here;
-    // this test focuses on: a pong on the socket reaches gateway without error.
     const s = new FakeSocket()
     gateway.handleConnection(s)
-    s.simulatePong() // must not throw even when no heartbeat attached
+    s.simulatePong() // pong handler registered; safe no-op when no heartbeat attached
     expect(true).toBe(true)
   })
 })
