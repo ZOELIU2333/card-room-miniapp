@@ -148,3 +148,22 @@ describe('WsGateway routing', () => {
     expect(true).toBe(true)
   })
 })
+
+describe('WsGateway.stopHeartbeat', () => {
+  it('clears the heartbeat timer', () => {
+    const gw = new WsGateway({ authenticator: new StubAuthenticator() })
+    let cleared = false
+    const scheduler = {
+      set: (_cb: () => void, _ms: number) => 1,
+      clear: (_id: number) => { cleared = true },
+    }
+    gw.startHeartbeat(scheduler, 1000)
+    gw.stopHeartbeat()
+    expect(cleared).toBe(true)
+  })
+
+  it('is a no-op when no heartbeat started', () => {
+    const gw = new WsGateway({ authenticator: new StubAuthenticator() })
+    expect(() => gw.stopHeartbeat()).not.toThrow()
+  })
+})

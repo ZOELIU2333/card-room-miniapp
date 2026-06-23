@@ -43,6 +43,11 @@ export class WsGateway implements Transport {
     return hb
   }
 
+  stopHeartbeat(): void {
+    this.heartbeat?.stop()
+    this.heartbeat = null
+  }
+
   async idle(): Promise<void> {
     await this.pending
   }
