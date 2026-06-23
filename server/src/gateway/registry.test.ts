@@ -50,4 +50,15 @@ describe('ConnectionRegistry', () => {
     const c = reg.add(new FakeSocket()); reg.authConnection(c, 'p1')
     expect(reg.playerOf(c)).toBe('p1')
   })
+
+  it('evicted connection socket is still retrievable so caller can close it', () => {
+    const reg = new ConnectionRegistry()
+    const s1 = new FakeSocket(); const c1 = reg.add(s1)
+    reg.authConnection(c1, 'p1')
+    const s2 = new FakeSocket(); const c2 = reg.add(s2)
+    const evicted = reg.authConnection(c2, 'p1')
+    expect(evicted).toBe(c1)
+    // 调用方要能拿到被顶掉的旧 socket 去关它（修复前这里是 undefined）
+    expect(reg.socketOf(evicted!)).toBe(s1)
+  })
 })

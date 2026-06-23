@@ -31,7 +31,7 @@ export class ConnectionRegistry {
     const prev = this.playerToConn.get(playerId) ?? null
     if (prev !== null && prev !== connId) {
       this.connToPlayer.delete(prev)
-      this.sockets.delete(prev)
+      // 不删 socket：返回 prev 让调用方关闭它（关闭触发 close → removeConnection 清理 socket map）。
     }
     this.connToPlayer.set(connId, playerId)
     this.playerToConn.set(playerId, connId)
