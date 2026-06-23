@@ -1,5 +1,5 @@
 // gateway 核心只依赖这个最小连接抽象，不依赖具体的 ws.WebSocket。
-// 真 ws 在 createGateway 里用薄 adapter 包成 Socket；测试用 FakeSocket。
+// 真 ws 用薄 adapter（wrap）包成 Socket；测试用 FakeSocket。
 export type SocketEvent = 'message' | 'close' | 'pong'
 
 export interface Socket {
