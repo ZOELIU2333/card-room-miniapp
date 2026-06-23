@@ -49,3 +49,13 @@ export function identifyCombo(cards: Card[]): Combo | null {
   }
   return null
 }
+
+export function canBeat(candidate: Combo, target: Combo): boolean {
+  if (candidate.type === 'BOMB' && target.type !== 'BOMB') return true
+  if (candidate.type !== 'BOMB' && target.type === 'BOMB') return false
+  if (candidate.type === 'BOMB' && target.type === 'BOMB')
+    return candidate.power > target.power
+  if (candidate.type !== target.type) return false
+  if (candidate.type === 'STRAIGHT' && candidate.length !== target.length) return false
+  return candidate.power > target.power
+}
