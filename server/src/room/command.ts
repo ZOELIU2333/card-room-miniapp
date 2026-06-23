@@ -32,13 +32,22 @@ export class CommandQueue {
 
   private async run(): Promise<void> {
     this.running = true
-    while (this.queue.length > 0) {
-      const cmd = this.queue.shift()!
-      await this.handler(cmd)
+    try {
+      while (this.queue.length > 0) {
+        const cmd = this.queue.shift()!
+        try {
+          await this.handler(cmd)
+        } catch {
+          // 单条命令处理失败不应拖垮整个房间队列；吞掉继续下一条。
+          // Room 的 handler 设计上不抛（拒绝走事件、快照失败内部 catch），
+          // 这里是防御性兜底，保证队列永不死锁。
+        }
+      }
+    } finally {
+      this.running = false
+      const resolvers = this.idleResolvers
+      this.idleResolvers = []
+      for (const r of resolvers) r()
     }
-    this.running = false
-    const resolvers = this.idleResolvers
-    this.idleResolvers = []
-    for (const r of resolvers) r()
   }
 }

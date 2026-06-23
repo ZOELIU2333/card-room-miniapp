@@ -33,4 +33,15 @@ describe('CommandQueue serial execution', () => {
     await q.drain()
     expect(true).toBe(true)
   })
+  it('a throwing handler does not wedge the queue: later commands still run and drain resolves', async () => {
+    const seen: string[] = []
+    const q = new CommandQueue(async (c) => {
+      if (c.type === 'PASS') throw new Error('boom')
+      seen.push(c.type)
+    })
+    q.enqueue({ type: 'PASS', playerId: 'p1' }) // handler throws on this one
+    q.enqueue({ type: 'JOIN', playerId: 'p2' }) // must still be processed
+    await q.drain() // must resolve, not hang
+    expect(seen).toEqual(['JOIN'])
+  })
 })
