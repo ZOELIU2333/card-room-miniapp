@@ -124,4 +124,28 @@ describe('Room play, timeout, finish', () => {
     expect(payload.ranking).toHaveLength(3)
     expect(payload.ranking[0]!.rank).toBe(1)
   })
+
+  it('LEAVE during play is a no-op: game continues, turn unchanged', async () => {
+    const { room } = await started()
+    const before = room.currentPlayerId()
+    const someone = ['p1','p2','p3'].find((id) => id !== before)!
+    room.enqueue({ type: 'LEAVE', playerId: someone })
+    await room.idle()
+    expect(room.phase).toBe('PLAYING')
+    expect(room.currentPlayerId()).toBe(before)
+  })
+
+  it('forwards engine reject reason to only the acting player and leaves state unchanged', async () => {
+    const { t, room } = await started()
+    const current = room.currentPlayerId()!
+    // 当前玩家打一张几乎肯定不在手里的牌组合（两张不成对）→ 引擎拒 ILLEGAL_COMBO 或 NOT_IN_HAND
+    const turnBefore = room.currentTurn()
+    room.enqueue({ type: 'PLAY', playerId: current, cards: [{ rank: '3', suit: 'D' }, { rank: '7', suit: 'S' }] })
+    await room.idle()
+    const rejects = t.sentTo(current).filter((m) => m.type === 'REJECTED')
+    expect(rejects.length).toBeGreaterThanOrEqual(1)
+    // 回合未推进（被拒不改状态）
+    expect(room.currentTurn()).toBe(turnBefore)
+    expect(room.phase).toBe('PLAYING')
+  })
 })

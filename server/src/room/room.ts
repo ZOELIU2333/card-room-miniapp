@@ -117,8 +117,14 @@ export class Room {
   private async onTimeout(turn: number): Promise<void> {
     if (!this.state || this.phase !== 'PLAYING' || turn !== this.turn) return
     const seat = this.state.currentPlayer
+    const playerId = this.seatOrder[seat]!
     const action = chooseAutoMove(this.deps.engine, this.state, seat)
-    this.applyAction(action, this.seatOrder[seat]!)
+    const accepted = this.applyAction(action, playerId)
+    // 防御：万一代打选出的动作被引擎拒（理论上不会，chooseAutoMove 只选合法动作），
+    // 退一步尝试 PASS，保证回合不会因代打失败而卡死。
+    if (!accepted) {
+      this.applyAction({ type: 'PASS', playerIndex: seat }, playerId)
+    }
   }
 
   private async onLeave(playerId: string): Promise<void> {
@@ -130,7 +136,8 @@ export class Room {
   }
 
   // 把动作交引擎、按事件推进，并执行广播优先/快照异步/计时器管理。
-  private applyAction(action: PdkAction, actingPlayerId: string): void {
+  // 返回 true 表示动作被引擎接受并推进；false 表示被拒（状态未变）。
+  private applyAction(action: PdkAction, actingPlayerId: string): boolean {
     const { state, events } = this.deps.engine.step(this.state!, action)
     const rejected = events.find(
       (e): e is Extract<PdkEvent, { type: 'REJECTED' }> => e.type === 'REJECTED',
@@ -139,7 +146,7 @@ export class Room {
       // 非法意图只回发给本人，不改状态、不动计时器。
       this.deps.transport.send(actingPlayerId,
         { type: 'REJECTED', payload: { reason: rejected.reason } })
-      return
+      return false
     }
     this.state = state
     this.turn += 1
@@ -153,12 +160,13 @@ export class Room {
         payload: { ranking: this.deps.engine.ranking(state) },
       })
       void this.persist()
-      return
+      return true
     }
 
     this.broadcastState()        // 同步快路径
     void this.persist()          // 异步慢路径
     this.timer.start(this.turn)  // 给下一位起计时器
+    return true
   }
 
   private start(): void {
