@@ -29,9 +29,20 @@ function wrap(ws: WebSocket): Socket {
 }
 
 // 在给定端口起真 ws server，把每个连接交给 gateway 核心。
-export function createGateway(port: number, deps: WsGatewayDeps): { gateway: WsGateway; wss: WebSocketServer } {
+export function createGateway(
+  port: number,
+  deps: WsGatewayDeps,
+  opts?: { heartbeatMs?: number },
+): { gateway: WsGateway; wss: WebSocketServer } {
   const gateway = new WsGateway(deps)
   const wss = new WebSocketServer({ port })
   wss.on('connection', (ws) => gateway.handleConnection(wrap(ws)))
+  if (opts?.heartbeatMs) {
+    const intervalScheduler = {
+      set: (cb: () => void, ms: number) => setInterval(cb, ms) as unknown as number,
+      clear: (id: number) => clearInterval(id),
+    }
+    gateway.startHeartbeat(intervalScheduler, opts.heartbeatMs)
+  }
   return { gateway, wss }
 }

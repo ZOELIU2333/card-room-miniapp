@@ -3,6 +3,7 @@ import type { RoomManager } from '../room/manager'
 import type { Authenticator } from './auth'
 import type { Socket } from './socket'
 import { ConnectionRegistry } from './registry'
+import { Heartbeat } from './heartbeat'
 import { parseClientMessage, type ClientMessage } from './protocol'
 
 type ConnState = 'CONNECTED' | 'AUTHED' | 'IN_ROOM'
@@ -20,6 +21,7 @@ export class WsGateway implements Transport {
   private readonly registry = new ConnectionRegistry()
   private readonly conns = new Map<number, ConnInfo>()
   private manager: RoomManager | null = null
+  private heartbeat: Heartbeat | null = null
   // 串行化异步处理（认证/入房是 async），保证 idle() 能等齐——测试用。
   private pending: Promise<void> = Promise.resolve()
 
@@ -27,6 +29,18 @@ export class WsGateway implements Transport {
 
   attachRoomManager(manager: RoomManager): void {
     this.manager = manager
+  }
+
+  attachHeartbeat(hb: Heartbeat): void {
+    this.heartbeat = hb
+  }
+
+  // 用自己持有的 registry 构造并启动 Heartbeat，避免对外暴露私有 registry。
+  startHeartbeat(scheduler: import('../room/timer').TimerScheduler, intervalMs: number): Heartbeat {
+    const hb = new Heartbeat(this.registry, scheduler, intervalMs, () => { /* onDead: registry already cleaned by Heartbeat.tick */ })
+    this.heartbeat = hb
+    hb.start()
+    return hb
   }
 
   async idle(): Promise<void> {
@@ -38,6 +52,7 @@ export class WsGateway implements Transport {
     this.conns.set(connId, { state: 'CONNECTED' })
     socket.on('message', (data) => { this.pending = this.pending.then(() => this.onMessage(connId, data)) })
     socket.on('close', () => this.onClose(connId))
+    socket.on('pong', () => this.heartbeat?.onPong(connId))
   }
 
   private async onMessage(connId: number, raw: string): Promise<void> {
@@ -70,6 +85,8 @@ export class WsGateway implements Transport {
       case 'CREATE':
       case 'JOIN': {
         const room = this.manager!.getRoom(msg.roomId) ?? this.manager!.createRoom(msg.roomId)
+        const verdict = room.canJoin(playerId)
+        if (!verdict.ok) return this.sendTo(socket, this.reject(verdict.reason))
         this.registry.joinRoom(playerId, msg.roomId)
         info.state = 'IN_ROOM'
         room.enqueue({ type: 'JOIN', playerId })

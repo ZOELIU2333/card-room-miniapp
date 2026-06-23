@@ -37,6 +37,15 @@ export class Room {
     this.queue.enqueue(cmd)
   }
 
+  // gateway 在投递 JOIN 命令前先问一次能否加入，避免乐观提交成员关系。
+  // 与 onJoin 的判定一致；不改状态。
+  canJoin(playerId: string): { ok: true } | { ok: false; reason: 'ALREADY_STARTED' | 'ALREADY_JOINED' | 'ROOM_FULL' } {
+    if (this.phase !== 'WAITING') return { ok: false, reason: 'ALREADY_STARTED' }
+    if (this.seatOrder.includes(playerId)) return { ok: false, reason: 'ALREADY_JOINED' }
+    if (this.seatOrder.length >= this.deps.capacity) return { ok: false, reason: 'ROOM_FULL' }
+    return { ok: true }
+  }
+
   // 等待队列清空（测试用）。
   idle(): Promise<void> {
     return this.queue.drain()
