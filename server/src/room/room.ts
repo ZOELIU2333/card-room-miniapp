@@ -51,6 +51,15 @@ export class Room {
     return this.turn
   }
 
+  // 从快照重建：直接灌入座位、状态、回合号，不重新发牌。
+  restoreFrom(snapshot: RoomSnapshot): void {
+    this.seatOrder = [...snapshot.seatOrder]
+    this.state = snapshot.game
+    this.turn = snapshot.turn
+    this.phase = snapshot.phase
+    if (this.phase === 'PLAYING') this.timer.start(this.turn)
+  }
+
   private async handle(cmd: Command): Promise<void> {
     switch (cmd.type) {
       case 'JOIN': return this.onJoin(cmd.playerId)
