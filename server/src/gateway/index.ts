@@ -1,5 +1,4 @@
-import { WebSocketServer, type WebSocket } from 'ws'
-import { WsGateway, type WsGatewayDeps } from './gateway'
+import type { WebSocket } from 'ws'
 import type { Socket } from './socket'
 
 export { WsGateway } from './gateway'
@@ -14,7 +13,7 @@ export type { Socket } from './socket'
 export { FakeSocket } from './socket'
 
 // 把真 ws.WebSocket 包成 gateway 的 Socket 抽象（薄 adapter）。
-function wrap(ws: WebSocket): Socket {
+export function wrap(ws: WebSocket): Socket {
   return {
     send: (data) => ws.send(data),
     close: () => ws.close(),
@@ -26,23 +25,4 @@ function wrap(ws: WebSocket): Socket {
       else ws.on('pong', () => (handler as () => void)())
     },
   }
-}
-
-// 在给定端口起真 ws server，把每个连接交给 gateway 核心。
-export function createGateway(
-  port: number,
-  deps: WsGatewayDeps,
-  opts?: { heartbeatMs?: number },
-): { gateway: WsGateway; wss: WebSocketServer } {
-  const gateway = new WsGateway(deps)
-  const wss = new WebSocketServer({ port })
-  wss.on('connection', (ws) => gateway.handleConnection(wrap(ws)))
-  if (opts?.heartbeatMs) {
-    const intervalScheduler = {
-      set: (cb: () => void, ms: number) => setInterval(cb, ms) as unknown as number,
-      clear: (id: number) => clearInterval(id),
-    }
-    gateway.startHeartbeat(intervalScheduler, opts.heartbeatMs)
-  }
-  return { gateway, wss }
 }

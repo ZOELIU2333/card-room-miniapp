@@ -1,10 +1,9 @@
 import { WebSocketServer, type WebSocket } from 'ws'
-import type { Socket } from './gateway/socket'
 import type { Config } from './config'
 import type { Authenticator } from './gateway'
 import type { RoomManager as RoomManagerType } from './room'
 import type { WsGateway as WsGatewayType } from './gateway'
-import { WsGateway, StubAuthenticator, WechatAuthenticator } from './gateway'
+import { WsGateway, StubAuthenticator, WechatAuthenticator, wrap } from './gateway'
 import { RoomManager, InMemorySnapshotStore, realScheduler } from './room'
 import { PaodekuaiEngine } from './engine/paodekuai'
 
@@ -29,21 +28,6 @@ const intervalScheduler = {
   clear: (id: number) => clearInterval(id),
 }
 
-// 把真 ws.WebSocket 包成 gateway 的 Socket 抽象（薄 adapter）；ws 的事件签名与 Socket 不同，这里做形参收敛。
-function wrap(ws: WebSocket): Socket {
-  return {
-    send: (data) => ws.send(data),
-    close: () => ws.close(),
-    terminate: () => ws.terminate(),
-    ping: () => ws.ping(),
-    on: (event: 'message' | 'close' | 'pong', handler: (...a: never[]) => void) => {
-      if (event === 'message') ws.on('message', (d) => (handler as (s: string) => void)(d.toString()))
-      else if (event === 'close') ws.on('close', () => (handler as () => void)())
-      else ws.on('pong', () => (handler as () => void)())
-    },
-  }
-}
-
 function defaultWssFactory(port: number): WssLike {
   return new WebSocketServer({ port }) as unknown as WssLike
 }
@@ -53,7 +37,7 @@ export function createServer(
   opts?: { wssFactory?: WssFactory },
 ): RunningServer {
   const authenticator: Authenticator = config.wx
-    ? new WechatAuthenticator(config.wx, globalThis.fetch as never)
+    ? new WechatAuthenticator(config.wx, globalThis.fetch)
     : new StubAuthenticator()
 
   const gateway = new WsGateway({ authenticator })
