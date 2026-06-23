@@ -149,3 +149,29 @@ describe('Room play, timeout, finish', () => {
     expect(room.phase).toBe('PLAYING')
   })
 })
+
+describe('Room resyncTo', () => {
+  async function started() {
+    const t = new RecordingTransport()
+    const room = makeRoom(t)
+    for (const id of ['p1','p2','p3']) room.enqueue({ type: 'JOIN', playerId: id })
+    await room.idle()
+    return { t, room }
+  }
+  it('re-pushes current desensitized state to one player', async () => {
+    const { t, room } = await started()
+    const before = t.sentTo('p1').filter((m) => m.type === 'STATE').length
+    room.resyncTo('p1')
+    const after = t.sentTo('p1').filter((m) => m.type === 'STATE')
+    expect(after.length).toBe(before + 1)
+    const view = after[after.length - 1]!.payload as { you: { hand: unknown[] }; others: unknown[] }
+    expect(view.you.hand.length).toBe(16)
+    expect(view.others).toHaveLength(2)
+  })
+  it('resyncTo a non-member or before start is a no-op', async () => {
+    const t = new RecordingTransport()
+    const room = makeRoom(t)
+    room.resyncTo('ghost') // 未开局
+    expect(t.sentTo('ghost')).toHaveLength(0)
+  })
+})

@@ -51,6 +51,25 @@ export class Room {
     return this.turn
   }
 
+  // 断线重连后，把当前脱敏状态重推给单个玩家（gateway RESUME 用）。
+  // 仅在对局进行中且该玩家在座时有效。
+  resyncTo(playerId: string): void {
+    if (!this.state || this.phase === 'WAITING') return
+    const i = this.seatOrder.indexOf(playerId)
+    if (i === -1) return
+    const st = this.state
+    const me = st.players[i]!
+    const view = {
+      you: { playerId: me.id, hand: me.hand, seat: i },
+      others: st.players
+        .filter((_, j) => j !== i)
+        .map((p) => ({ playerId: p.id, handCount: p.hand.length })),
+      currentPlayer: st.currentPlayer,
+      lastPlay: st.lastPlay,
+    }
+    this.deps.transport.send(me.id, { type: 'STATE', payload: view })
+  }
+
   // 从快照重建：直接灌入座位、状态、回合号，不重新发牌。
   restoreFrom(snapshot: RoomSnapshot): void {
     this.seatOrder = [...snapshot.seatOrder]
