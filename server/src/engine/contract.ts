@@ -23,9 +23,9 @@ export interface RankEntry {
  *   但契约据此约定，未来玩法无需改签名。
  * - 服务端权威：客户端只发意图，合法性与结果一律由 step 判定。
  */
-export interface GameEngine<S, A, E> {
+export interface GameEngine<S, A, E, V = unknown> {
   readonly kind: string
-  createInitialState(playerIds: string[], rng: () => number): S
+  createInitialState(playerIds: string[], rng: () => number, variant: V): S
   step(state: S, action: A): StepResult<S, E>
   isFinished(state: S): boolean
   ranking(state: S): RankEntry[]
