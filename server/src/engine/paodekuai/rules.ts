@@ -76,6 +76,7 @@ export function applyAction(state: GameState, action: PdkAction): ApplyResult {
       events.push({ type: 'PLAYER_FINISHED', playerIndex: action.playerIndex, rank: finishedCount })
     }
 
+    // 第一个出完者即终局：本版不续打 2/3 名，由 ranking() 按剩牌补名次。
     if (finishedCount >= 1) {
       return {
         state: { ...state, players, finishedCount, phase: 'FINISHED',

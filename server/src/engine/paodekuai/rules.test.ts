@@ -83,3 +83,27 @@ describe('applyAction - TIMEOUT', () => {
     expect(events).toContainEqual({ type: 'REJECTED', reason: 'NO_OP' })
   })
 })
+
+describe('applyAction - game over', () => {
+  function lastCardState(): GameState {
+    const players: PlayerState[] = [
+      { id: 'p1', hand: [card('5')], finishedRank: null },
+      { id: 'p2', hand: [card('8'),card('9')], finishedRank: null },
+      { id: 'p3', hand: [card('J'),card('Q')], finishedRank: null },
+    ]
+    return { players, kitty: [], currentPlayer: 0, lastPlay: null,
+      passesSinceLastPlay: 0, phase: 'PLAYING', finishedCount: 0 }
+  }
+  it('emptying hand finishes the player and ends the game', () => {
+    const { state, events } = applyAction(lastCardState(), { type: 'PLAY', playerIndex: 0, cards: [card('5')] })
+    expect(state.phase).toBe('FINISHED')
+    expect(state.players[0]!.finishedRank).toBe(1)
+    expect(events).toContainEqual({ type: 'PLAYER_FINISHED', playerIndex: 0, rank: 1 })
+    expect(events).toContainEqual({ type: 'GAME_OVER' })
+  })
+  it('rejects any action once finished', () => {
+    const finished = applyAction(lastCardState(), { type: 'PLAY', playerIndex: 0, cards: [card('5')] }).state
+    const { events } = applyAction(finished, { type: 'PLAY', playerIndex: 1, cards: [card('8')] })
+    expect(events).toContainEqual({ type: 'REJECTED', reason: 'GAME_FINISHED' })
+  })
+})

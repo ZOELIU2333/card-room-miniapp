@@ -18,6 +18,14 @@ describe('canBeat', () => {
     const s6 = combo([c('3'),c('4'),c('5'),c('6'),c('7'),c('8')])
     expect(canBeat(s6, s5)).toBe(false)
   })
+  it('same-type higher power beats lower', () => {
+    expect(canBeat(combo([c('9','C'),c('9','D')]), combo([c('7','C'),c('7','D')]))).toBe(true)
+    expect(canBeat(combo([c('K','C'),c('K','D'),c('K','H')]), combo([c('9','C'),c('9','D'),c('9','H')]))).toBe(true)
+    const sLow = combo([c('3'),c('4'),c('5'),c('6'),c('7')])
+    const sHigh = combo([c('4'),c('5'),c('6'),c('7'),c('8')])
+    expect(canBeat(sHigh, sLow)).toBe(true)
+    expect(canBeat(sLow, sHigh)).toBe(false)
+  })
   it('bomb beats non-bomb', () => {
     const bomb = combo([c('5','C'),c('5','D'),c('5','H'),c('5','S')])
     expect(canBeat(bomb, combo([c('2')]))).toBe(true)
