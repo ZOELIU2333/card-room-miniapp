@@ -13,6 +13,7 @@
 - [PRD](docs/PRD.md)
 - [UI 样式要求](docs/UI_STYLE.md)
 - [路线图](docs/ROADMAP.md)
+- [HTML 原型](prototype/index.html)
 
 ## 当前 UI 共识
 
