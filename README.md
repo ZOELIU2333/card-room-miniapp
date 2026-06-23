@@ -14,6 +14,7 @@
 - [UI 样式要求](docs/UI_STYLE.md)
 - [路线图](docs/ROADMAP.md)
 - [HTML 原型](prototype/index.html)
+- [图片热区原型](prototype/visual-prototype.html)
 
 ## 当前 UI 共识
 

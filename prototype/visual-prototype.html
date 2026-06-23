@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>开局 - 图片热区原型</title>
+    <style>
+      :root {
+        --bg: #080807;
+        --text: #eee5d1;
+        --muted: #a69e90;
+        --panel: rgba(13, 14, 13, 0.86);
+        --line: rgba(238, 229, 209, 0.22);
+        --jade: #9cac91;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 50% 0%, rgba(156, 172, 145, 0.14), transparent 34%),
+          #050505;
+        color: var(--text);
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      .stage {
+        width: min(100vw, 430px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+      }
+
+      .phone {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 390 / 844;
+        overflow: hidden;
+        border: 1px solid rgba(238, 229, 209, 0.14);
+        border-radius: 28px;
+        background: #090909;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.58);
+      }
+
+      .screen-img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .hotspot {
+        position: absolute;
+        border: 1px solid transparent;
+        border-radius: 18px;
+        background: transparent;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .hotspot:focus-visible,
+      .hotspot.is-selected {
+        outline: 0;
+        border-color: rgba(238, 229, 209, 0.55);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+          0 0 0 2px rgba(156, 172, 145, 0.12);
+      }
+
+      .hotspot::after {
+        content: attr(data-label);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        transform: translateX(-50%);
+        opacity: 0;
+        pointer-events: none;
+        white-space: nowrap;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 9px;
+        color: var(--text);
+        background: rgba(8, 8, 7, 0.9);
+        font-size: 12px;
+        transition: opacity 120ms ease;
+      }
+
+      .hotspot:hover::after,
+      .hotspot.is-selected::after {
+        opacity: 1;
+      }
+
+      .toast {
+        position: absolute;
+        left: 50%;
+        bottom: 96px;
+        width: max-content;
+        max-width: 82%;
+        transform: translateX(-50%) translateY(10px);
+        opacity: 0;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 9px 14px;
+        color: var(--text);
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+        font-size: 13px;
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .sheet {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 92px;
+        transform: translateY(18px);
+        opacity: 0;
+        pointer-events: none;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 16px;
+        color: var(--text);
+        background:
+          linear-gradient(160deg, rgba(238, 229, 209, 0.08), rgba(255, 255, 255, 0.02)),
+          rgba(9, 10, 9, 0.92);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.56);
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease;
+      }
+
+      .sheet.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+
+      .sheet-title {
+        margin: 0 0 7px;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .sheet-copy {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .sheet-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .sheet-button {
+        flex: 1;
+        height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        color: var(--text);
+        background: rgba(238, 229, 209, 0.08);
+        font: inherit;
+      }
+
+      .sheet-button.primary {
+        color: #10120f;
+        background: #d8cdb7;
+      }
+
+      .note {
+        margin: 14px 4px 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      /* Percent-based hit regions over a 390x844 design. */
+      [data-action="create"] {
+        left: 4.7%;
+        top: 30.2%;
+        width: 47.2%;
+        height: 21.2%;
+      }
+
+      [data-action="join"] {
+        left: 53.4%;
+        top: 30.2%;
+        width: 42.7%;
+        height: 21.2%;
+      }
+
+      [data-action="games"] {
+        left: 4.8%;
+        top: 55.8%;
+        width: 90.2%;
+        height: 9.8%;
+        border-radius: 14px;
+      }
+
+      [data-action="invite"] {
+        left: 4.6%;
+        top: 68.6%;
+        width: 90.6%;
+        height: 12.9%;
+      }
+
+      [data-action="home"] {
+        left: 3%;
+        bottom: 1.2%;
+        width: 15%;
+        height: 8.6%;
+        border-radius: 12px;
+      }
+
+      [data-action="friends"] {
+        left: 22%;
+        bottom: 1.2%;
+        width: 15%;
+        height: 8.6%;
+        border-radius: 12px;
+      }
+
+      [data-action="open"] {
+        left: 42.4%;
+        bottom: 0.8%;
+        width: 15.2%;
+        height: 9.6%;
+        border-radius: 50%;
+      }
+
+      [data-action="record"] {
+        left: 63%;
+        bottom: 1.2%;
+        width: 15%;
+        height: 8.6%;
+        border-radius: 12px;
+      }
+
+      [data-action="me"] {
+        left: 82%;
+        bottom: 1.2%;
+        width: 15%;
+        height: 8.6%;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage">
+      <section class="phone" aria-label="开局图片热区原型">
+        <img class="screen-img" src="../docs/assets/selected-dark-card-brand-side-by-side.png" alt="暗色牌具品牌首页效果图" />
+
+        <button class="hotspot" data-action="create" data-label="创建好友房"></button>
+        <button class="hotspot" data-action="join" data-label="输入房号"></button>
+        <button class="hotspot" data-action="games" data-label="切换玩法"></button>
+        <button class="hotspot" data-action="invite" data-label="加入老刘的房间"></button>
+        <button class="hotspot" data-action="home" data-label="首页"></button>
+        <button class="hotspot" data-action="friends" data-label="牌友"></button>
+        <button class="hotspot" data-action="open" data-label="开一桌"></button>
+        <button class="hotspot" data-action="record" data-label="战绩"></button>
+        <button class="hotspot" data-action="me" data-label="我的"></button>
+
+        <div class="sheet" id="sheet" aria-live="polite">
+          <h2 class="sheet-title" id="sheetTitle">创建好友房</h2>
+          <p class="sheet-copy" id="sheetCopy">选择玩法、局数和积分规则，然后分享给微信好友。</p>
+          <div class="sheet-actions">
+            <button class="sheet-button" data-close>取消</button>
+            <button class="sheet-button primary" data-close>继续</button>
+          </div>
+        </div>
+
+        <div class="toast" id="toast">已切换</div>
+      </section>
+      <p class="note">这个版本先保证视觉和效果图一致，只在关键区域加热区交互。适合 UI 定稿阶段；真正开发前再把定稿设计拆成组件。</p>
+    </main>
+
+    <script>
+      const copy = {
+        create: ["创建好友房", "选择玩法、局数和积分规则，然后分享给微信好友。"],
+        join: ["输入房号", "输入 6 位房间号，快速加入好友房。"],
+        invite: ["老刘等你", "240 · 经典玩法 · 3/4 人 · 等待中"],
+        open: ["开一桌", "从底部主按钮进入快速开桌流程。"],
+        friends: ["牌友", "查看在线好友、常约牌友和最近一起玩的人。"],
+        record: ["战绩", "查看最近对局、积分变化和好友排行。"],
+        me: ["我的", "管理资料、积分、设置与偏好玩法。"],
+      };
+
+      const sheet = document.getElementById("sheet");
+      const title = document.getElementById("sheetTitle");
+      const sheetCopy = document.getElementById("sheetCopy");
+      const toast = document.getElementById("toast");
+
+      let toastTimer = 0;
+      function showToast(text) {
+        toast.textContent = text;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 1200);
+      }
+
+      document.querySelectorAll(".hotspot").forEach((hotspot) => {
+        hotspot.addEventListener("click", () => {
+          document.querySelectorAll(".hotspot").forEach((item) => item.classList.remove("is-selected"));
+          hotspot.classList.add("is-selected");
+          const action = hotspot.dataset.action;
+          if (copy[action]) {
+            title.textContent = copy[action][0];
+            sheetCopy.textContent = copy[action][1];
+            sheet.classList.add("show");
+            return;
+          }
+          if (action === "games") {
+            sheet.classList.remove("show");
+            showToast("玩法区域：后续可切换跑得快 / 240 / 麻将 / 掼蛋 / 字牌");
+            return;
+          }
+          if (action === "home") {
+            sheet.classList.remove("show");
+            showToast("当前在首页");
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-close]").forEach((button) => {
+        button.addEventListener("click", () => {
+          sheet.classList.remove("show");
+        });
+      });
+    </script>
+  </body>
+</html>
