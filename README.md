@@ -16,6 +16,10 @@
 - [HTML 原型](prototype/index.html)
 - [图片热区原型](prototype/visual-prototype.html)
 
+## Figma
+
+- [开局 Card Room Miniapp - UI Prototype](https://www.figma.com/design/8dlFmCrIkB16GqoQepauHS)
+
 ## 当前 UI 共识
 
 核心不是普通棋牌大厅，而是一个简约、高级、深色调的好友牌局产品。底部需要固定一排主导航按钮。避免土味棋牌城、花哨手游感、红金国潮、强动画、廉价深绿金边、赌场感和生活类 App 感。
