@@ -6,6 +6,7 @@ import { TurnTimer, type TimerScheduler } from './timer'
 import type { Transport, ServerMessage } from './transport'
 import type { SnapshotStore, RoomSnapshot } from './snapshot'
 import type { Phase } from '../engine/paodekuai/state'
+import { chooseAutoMove } from './autoplay'
 
 export interface RoomDeps {
   roomId: string
@@ -41,11 +42,22 @@ export class Room {
     return this.queue.drain()
   }
 
+  currentPlayerId(): string | null {
+    if (!this.state || this.phase !== 'PLAYING') return null
+    return this.seatOrder[this.state.currentPlayer] ?? null
+  }
+
+  currentTurn(): number {
+    return this.turn
+  }
+
   private async handle(cmd: Command): Promise<void> {
     switch (cmd.type) {
       case 'JOIN': return this.onJoin(cmd.playerId)
-      // PLAY/PASS/TIMEOUT/LEAVE 在 Task 6 实现
-      default: return
+      case 'PLAY': return this.onAction(cmd.playerId, { kind: 'PLAY', cards: cmd.cards })
+      case 'PASS': return this.onAction(cmd.playerId, { kind: 'PASS' })
+      case 'TIMEOUT': return this.onTimeout(cmd.turn)
+      case 'LEAVE': return this.onLeave(cmd.playerId)
     }
   }
 
@@ -66,6 +78,78 @@ export class Room {
     if (this.seatOrder.length === this.deps.capacity) {
       this.start()
     }
+  }
+
+  private seatOf(playerId: string): number {
+    return this.seatOrder.indexOf(playerId)
+  }
+
+  // 处理玩家主动 PLAY/PASS。
+  private async onAction(
+    playerId: string,
+    intent: { kind: 'PLAY'; cards: import('../engine/paodekuai/card').Card[] } | { kind: 'PASS' },
+  ): Promise<void> {
+    if (!this.state || this.phase !== 'PLAYING') {
+      this.deps.transport.send(playerId, this.reject('GAME_NOT_PLAYING'))
+      return
+    }
+    const seat = this.seatOf(playerId)
+    if (seat === -1 || seat !== this.state.currentPlayer) {
+      this.deps.transport.send(playerId, this.reject('NOT_YOUR_TURN'))
+      return
+    }
+    const action: PdkAction = intent.kind === 'PLAY'
+      ? { type: 'PLAY', playerIndex: seat, cards: intent.cards }
+      : { type: 'PASS', playerIndex: seat }
+    this.applyAction(action, playerId)
+  }
+
+  // 计时器到期：比对回合号防过期，匹配则 autoplay 代打。
+  private async onTimeout(turn: number): Promise<void> {
+    if (!this.state || this.phase !== 'PLAYING' || turn !== this.turn) return
+    const seat = this.state.currentPlayer
+    const action = chooseAutoMove(this.deps.engine, this.state, seat)
+    this.applyAction(action, this.seatOrder[seat]!)
+  }
+
+  private async onLeave(playerId: string): Promise<void> {
+    // 体验版：离座不结束牌局，轮到该座位时由超时代打兜底。
+    // 仅在等待阶段允许真正退出席位。
+    if (this.phase === 'WAITING') {
+      this.seatOrder = this.seatOrder.filter((id) => id !== playerId)
+    }
+  }
+
+  // 把动作交引擎、按事件推进，并执行广播优先/快照异步/计时器管理。
+  private applyAction(action: PdkAction, actingPlayerId: string): void {
+    const { state, events } = this.deps.engine.step(this.state!, action)
+    const rejected = events.find(
+      (e): e is Extract<PdkEvent, { type: 'REJECTED' }> => e.type === 'REJECTED',
+    )
+    if (rejected) {
+      // 非法意图只回发给本人，不改状态、不动计时器。
+      this.deps.transport.send(actingPlayerId,
+        { type: 'REJECTED', payload: { reason: rejected.reason } })
+      return
+    }
+    this.state = state
+    this.turn += 1
+    this.timer.clear()
+
+    if (this.deps.engine.isFinished(state)) {
+      this.phase = 'FINISHED'
+      this.broadcastState()
+      this.deps.transport.broadcast(this.deps.roomId, {
+        type: 'GAME_OVER',
+        payload: { ranking: this.deps.engine.ranking(state) },
+      })
+      void this.persist()
+      return
+    }
+
+    this.broadcastState()        // 同步快路径
+    void this.persist()          // 异步慢路径
+    this.timer.start(this.turn)  // 给下一位起计时器
   }
 
   private start(): void {

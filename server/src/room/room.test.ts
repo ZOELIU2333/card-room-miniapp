@@ -68,3 +68,60 @@ describe('Room join and start', () => {
     expect(t.sentTo('p4').some((m) => m.type === 'REJECTED')).toBe(true)
   })
 })
+
+describe('Room play, timeout, finish', () => {
+  // 起一个已开局的房间，返回 room、transport，并给出当前该谁出牌的 playerId
+  async function started() {
+    const t = new RecordingTransport()
+    const room = makeRoom(t)
+    for (const id of ['p1','p2','p3']) room.enqueue({ type: 'JOIN', playerId: id })
+    await room.idle()
+    return { t, room }
+  }
+
+  it('rejects PLAY from a player who is not the current turn', async () => {
+    const { t, room } = await started()
+    const current = room.currentPlayerId()!
+    const notCurrent = ['p1','p2','p3'].find((id) => id !== current)!
+    room.enqueue({ type: 'PLAY', playerId: notCurrent, cards: [{ rank: '3', suit: 'D' }] })
+    await room.idle()
+    expect(t.sentTo(notCurrent).some(
+      (m) => m.type === 'REJECTED'
+        && (m.payload as { reason: string }).reason === 'NOT_YOUR_TURN')).toBe(true)
+  })
+
+  it('timeout triggers an autoplay move and advances the turn', async () => {
+    const { room } = await started()
+    const before = room.currentPlayerId()
+    // 直接投递一个与当前回合号匹配的 TIMEOUT（模拟计时器到期）
+    room.enqueue({ type: 'TIMEOUT', turn: room.currentTurn() })
+    await room.idle()
+    // 代打后回合应推进（除非这一手直接终局）
+    expect(room.currentPlayerId() !== before || room.phase === 'FINISHED').toBe(true)
+  })
+
+  it('stale TIMEOUT (wrong turn number) is ignored', async () => {
+    const { room } = await started()
+    const before = room.currentPlayerId()
+    room.enqueue({ type: 'TIMEOUT', turn: 999 }) // 过期回合号
+    await room.idle()
+    expect(room.currentPlayerId()).toBe(before)
+    expect(room.phase).toBe('PLAYING')
+  })
+
+  it('plays a full game to completion via repeated timeouts and broadcasts GAME_OVER', async () => {
+    const { t, room } = await started()
+    let guard = 0
+    while (room.phase === 'PLAYING' && guard < 3000) {
+      guard++
+      room.enqueue({ type: 'TIMEOUT', turn: room.currentTurn() })
+      await room.idle()
+    }
+    expect(room.phase).toBe('FINISHED')
+    const overMsgs = t.broadcastsTo('r1').filter((m) => m.type === 'GAME_OVER')
+    expect(overMsgs).toHaveLength(1)
+    const payload = overMsgs[0]!.payload as { ranking: Array<{ playerId: string; rank: number; score: number }> }
+    expect(payload.ranking).toHaveLength(3)
+    expect(payload.ranking[0]!.rank).toBe(1)
+  })
+})
