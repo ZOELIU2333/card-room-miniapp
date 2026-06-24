@@ -41,13 +41,11 @@ function runGame({ roomId, variant, players, expectedHandSize }) {
 
       // 我的回合：从手牌里挑牌力最低的单张试 PLAY；被 REJECTED 就降级 PASS。
       // 服务端权威——非法组合由引擎拒，客户端不复刻规则。
-      let triedCard = null
       function act() {
         if (!state.myTurn || state.finished) return
         if (state.hand.length === 0) return
         const sorted = [...state.hand].sort((a, b) => rankValue(a.rank) - rankValue(b.rank))
-        triedCard = sorted[0]
-        send({ type: 'PLAY', payload: { cards: [triedCard] } })
+        send({ type: 'PLAY', payload: { cards: [sorted[0]] } })
       }
 
       function send(obj) {
