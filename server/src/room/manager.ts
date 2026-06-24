@@ -4,6 +4,7 @@ import type { PdkAction, PdkEvent } from '../engine/paodekuai/rules'
 import type { Transport } from './transport'
 import type { SnapshotStore } from './snapshot'
 import type { TimerScheduler } from './timer'
+import type { DeckVariant } from '../engine/paodekuai/deck'
 import { Room } from './room'
 
 export interface RoomManagerDeps {
@@ -22,7 +23,7 @@ export class RoomManager {
 
   constructor(private readonly deps: RoomManagerDeps) {}
 
-  createRoom(roomId: string): Room {
+  createRoom(roomId: string, variant: DeckVariant = 'classic16'): Room {
     if (this.rooms.has(roomId)) throw new Error(`room ${roomId} already exists`)
     const room = new Room({
       roomId,
@@ -33,6 +34,7 @@ export class RoomManager {
       rng: this.deps.rngFor(roomId),
       capacity: this.deps.capacity,
       turnMs: this.deps.turnMs,
+      variant,
     })
     this.rooms.set(roomId, room)
     return room
@@ -59,6 +61,7 @@ export class RoomManager {
       rng: this.deps.rngFor(roomId),
       capacity: this.deps.capacity,
       turnMs: this.deps.turnMs,
+      variant: 'classic16',
     })
     room.restoreFrom(snapshot)
     this.rooms.set(roomId, room)

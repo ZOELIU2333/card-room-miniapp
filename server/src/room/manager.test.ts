@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RoomManager } from './manager'
+import { Room } from './room'
 import { PaodekuaiEngine } from '../engine/paodekuai/engine'
 import { RecordingTransport } from './transport'
 import { InMemorySnapshotStore } from './snapshot'
@@ -35,6 +36,27 @@ describe('RoomManager', () => {
     const { mgr } = makeManager()
     mgr.createRoom('r1')
     expect(() => mgr.createRoom('r1')).toThrow()
+  })
+
+  it('createRoom defaults to classic16 (16 cards dealt)', async () => {
+    const { mgr, transport } = makeManager()
+    const room = mgr.createRoom('r1')
+    for (const id of ['p1', 'p2', 'p3']) room.enqueue({ type: 'JOIN', playerId: id })
+    await room.idle()
+    const state = transport.sentTo('p1').filter((m) => m.type === 'STATE').at(-1)
+    const hand = (state!.payload as { you: { hand: unknown[] } }).you.hand
+    expect(hand).toHaveLength(16)
+  })
+
+  it('createRoom with classic15 deals 15 cards', async () => {
+    const { mgr, transport } = makeManager()
+    const room = mgr.createRoom('r1', 'classic15')
+    expect(room).toBeInstanceOf(Room)
+    for (const id of ['p1', 'p2', 'p3']) room.enqueue({ type: 'JOIN', playerId: id })
+    await room.idle()
+    const state = transport.sentTo('p1').filter((m) => m.type === 'STATE').at(-1)
+    const hand = (state!.payload as { you: { hand: unknown[] } }).you.hand
+    expect(hand).toHaveLength(15)
   })
 
   it('destroyRoom removes it', () => {
