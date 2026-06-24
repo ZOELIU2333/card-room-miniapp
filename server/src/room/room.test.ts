@@ -20,6 +20,7 @@ function makeRoom(transport: RecordingTransport) {
     rng: seededRandom(123),
     capacity: 3,
     turnMs: 30000,
+    variant: 'classic16',
   })
 }
 

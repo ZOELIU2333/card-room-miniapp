@@ -6,6 +6,7 @@ import { TurnTimer, type TimerScheduler } from './timer'
 import type { Transport, ServerMessage } from './transport'
 import type { SnapshotStore, RoomSnapshot } from './snapshot'
 import type { Phase } from '../engine/paodekuai/state'
+import type { DeckVariant } from '../engine/paodekuai/deck'
 import { chooseAutoMove } from './autoplay'
 
 export interface RoomDeps {
@@ -17,6 +18,7 @@ export interface RoomDeps {
   rng: () => number
   capacity: number
   turnMs: number
+  variant: DeckVariant
 }
 
 export class Room {
@@ -198,7 +200,7 @@ export class Room {
   }
 
   private start(): void {
-    this.state = this.deps.engine.createInitialState(this.seatOrder, this.deps.rng)
+    this.state = this.deps.engine.createInitialState(this.seatOrder, this.deps.rng, this.deps.variant)
     this.phase = 'PLAYING'
     this.turn = 1
     this.broadcastState()
