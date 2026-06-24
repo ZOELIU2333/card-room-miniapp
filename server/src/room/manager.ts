@@ -8,7 +8,7 @@ import type { DeckVariant } from '../engine/paodekuai/deck'
 import { Room } from './room'
 
 export interface RoomManagerDeps {
-  engine: GameEngine<GameState, PdkAction, PdkEvent>
+  engine: GameEngine<GameState, PdkAction, PdkEvent, DeckVariant>
   transport: Transport
   store: SnapshotStore
   scheduler: TimerScheduler

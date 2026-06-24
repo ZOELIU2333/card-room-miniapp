@@ -11,7 +11,7 @@ import { chooseAutoMove } from './autoplay'
 
 export interface RoomDeps {
   roomId: string
-  engine: GameEngine<GameState, PdkAction, PdkEvent>
+  engine: GameEngine<GameState, PdkAction, PdkEvent, DeckVariant>
   transport: Transport
   store: SnapshotStore
   scheduler: TimerScheduler
