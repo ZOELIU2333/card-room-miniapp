@@ -2,12 +2,13 @@ import type { GameEngine, RankEntry } from '../contract'
 import type { GameState } from './state'
 import { createInitialState } from './state'
 import { applyAction, type PdkAction, type PdkEvent } from './rules'
+import type { DeckVariant } from './deck'
 
-export class PaodekuaiEngine implements GameEngine<GameState, PdkAction, PdkEvent> {
+export class PaodekuaiEngine implements GameEngine<GameState, PdkAction, PdkEvent, DeckVariant> {
   readonly kind = 'paodekuai'
 
-  createInitialState(playerIds: string[], rng: () => number): GameState {
-    return createInitialState(playerIds, rng)
+  createInitialState(playerIds: string[], rng: () => number, variant: DeckVariant): GameState {
+    return createInitialState(playerIds, rng, variant)
   }
 
   step(state: GameState, action: PdkAction) {

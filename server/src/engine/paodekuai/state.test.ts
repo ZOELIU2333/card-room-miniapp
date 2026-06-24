@@ -8,19 +8,39 @@ function seededRandom(seed: number): () => number {
 
 describe('createInitialState', () => {
   it('3 players each 16 cards, 4 in kitty', () => {
-    const st = createInitialState(['p1','p2','p3'], seededRandom(1))
+    const st = createInitialState(['p1','p2','p3'], seededRandom(1), 'classic16')
     expect(st.players).toHaveLength(3)
     for (const p of st.players) expect(p.hand).toHaveLength(16)
     expect(st.kitty).toHaveLength(4)
   })
   it('first player holds diamond 3', () => {
-    const st = createInitialState(['p1','p2','p3'], seededRandom(1))
+    const st = createInitialState(['p1','p2','p3'], seededRandom(1), 'classic16')
     const holder = st.players.findIndex((p) => p.hand.some((c) => c.rank==='3' && c.suit==='D'))
     expect(st.currentPlayer).toBe(holder)
   })
   it('starts PLAYING with empty table', () => {
-    const st = createInitialState(['p1','p2','p3'], seededRandom(1))
+    const st = createInitialState(['p1','p2','p3'], seededRandom(1), 'classic16')
     expect(st.phase).toBe('PLAYING')
     expect(st.lastPlay).toBeNull()
+  })
+
+  it('classic15: 3 players each 15 cards, no kitty, diamond-3 holder leads', () => {
+    const st = createInitialState(['a','b','c'], seededRandom(7), 'classic15')
+    expect(st.players).toHaveLength(3)
+    for (const p of st.players) expect(p.hand).toHaveLength(15)
+    expect(st.kitty).toHaveLength(0)
+    const holder = st.players.findIndex((p) => p.hand.some((c) => c.rank==='3' && c.suit==='D'))
+    expect(holder).not.toBe(-1)
+    expect(st.currentPlayer).toBe(holder)
+  })
+
+  it('classic16: 3 players each 16 cards, 4 in kitty, diamond-3 holder leads', () => {
+    const st = createInitialState(['a','b','c'], seededRandom(7), 'classic16')
+    expect(st.players).toHaveLength(3)
+    for (const p of st.players) expect(p.hand).toHaveLength(16)
+    expect(st.kitty).toHaveLength(4)
+    const holder = st.players.findIndex((p) => p.hand.some((c) => c.rank==='3' && c.suit==='D'))
+    expect(holder).not.toBe(-1)
+    expect(st.currentPlayer).toBe(holder)
   })
 })

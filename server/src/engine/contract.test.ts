@@ -19,7 +19,7 @@ describe('PaodekuaiEngine satisfies GameEngine contract', () => {
   })
 
   it('createInitialState + step + isFinished + ranking work through the interface', () => {
-    let st = engine.createInitialState(['p1','p2','p3'], seededRandom(123))
+    let st = engine.createInitialState(['p1','p2','p3'], seededRandom(123), 'classic16')
     expect(engine.isFinished(st)).toBe(false)
 
     let over = false, guard = 0

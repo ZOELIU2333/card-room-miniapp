@@ -1,7 +1,6 @@
 import type { Card } from './card'
 import type { Combo } from './combo'
-import { makeFullDeck } from './card'
-import { shuffle, deal } from './deck'
+import { shuffle, deal, makeDeck, type DeckVariant } from './deck'
 
 export type Phase = 'PLAYING' | 'FINISHED'
 
@@ -23,8 +22,9 @@ export interface GameState {
   finishedCount: number
 }
 
-export function createInitialState(playerIds: string[], rng: () => number): GameState {
-  const { hands, kitty } = deal(shuffle(makeFullDeck(), rng), playerIds.length, 16)
+export function createInitialState(playerIds: string[], rng: () => number, variant: DeckVariant): GameState {
+  const perPlayer = variant === 'classic15' ? 15 : 16
+  const { hands, kitty } = deal(shuffle(makeDeck(variant), rng), playerIds.length, perPlayer)
   const players: PlayerState[] = playerIds.map((id, i) => ({
     id, hand: hands[i]!, finishedRank: null,
   }))
