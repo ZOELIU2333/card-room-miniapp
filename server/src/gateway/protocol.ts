@@ -39,6 +39,7 @@ export function parseClientMessage(raw: string): ParseResult {
       const roomId = payload['roomId']
       if (typeof roomId !== 'string') return { ok: false, reason: 'BAD_MESSAGE' }
       const rawVariant = payload['variant']
+      // 体验版宽松：variant 缺失或无法识别一律回落 classic16，不报 BAD_MESSAGE
       const variant: DeckVariant = rawVariant === 'classic15' ? 'classic15' : 'classic16'
       return { ok: true, msg: { type: 'CREATE', roomId, variant } }
     }
