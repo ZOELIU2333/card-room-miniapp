@@ -1,9 +1,10 @@
 import type { Card } from '../engine/paodekuai/card'
+import type { DeckVariant } from '../engine/paodekuai/deck'
 
 // 入站消息（已校验的判别联合）。出站复用 room 的 ServerMessage。
 export type ClientMessage =
   | { type: 'AUTH'; code: string }
-  | { type: 'CREATE'; roomId: string }
+  | { type: 'CREATE'; roomId: string; variant: DeckVariant }
   | { type: 'JOIN'; roomId: string }
   | { type: 'PLAY'; cards: Card[] }
   | { type: 'PASS' }
@@ -34,11 +35,17 @@ export function parseClientMessage(raw: string): ParseResult {
       if (typeof code !== 'string') return { ok: false, reason: 'BAD_MESSAGE' }
       return { ok: true, msg: { type: 'AUTH', code } }
     }
-    case 'CREATE':
+    case 'CREATE': {
+      const roomId = payload['roomId']
+      if (typeof roomId !== 'string') return { ok: false, reason: 'BAD_MESSAGE' }
+      const rawVariant = payload['variant']
+      const variant: DeckVariant = rawVariant === 'classic15' ? 'classic15' : 'classic16'
+      return { ok: true, msg: { type: 'CREATE', roomId, variant } }
+    }
     case 'JOIN': {
       const roomId = payload['roomId']
       if (typeof roomId !== 'string') return { ok: false, reason: 'BAD_MESSAGE' }
-      return { ok: true, msg: { type, roomId } }
+      return { ok: true, msg: { type: 'JOIN', roomId } }
     }
     case 'PLAY': {
       const cards = payload['cards']

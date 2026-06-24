@@ -10,7 +10,31 @@ describe('parseClientMessage', () => {
     expect(parseClientMessage(JSON.stringify({ type: 'JOIN', payload: { roomId: 'r1' } })))
       .toEqual({ ok: true, msg: { type: 'JOIN', roomId: 'r1' } })
     expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1' } })))
-      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1' } })
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic16' } })
+  })
+  it('parses CREATE with explicit classic15 variant', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1', variant: 'classic15' } })))
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic15' } })
+  })
+  it('parses CREATE with explicit classic16 variant', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1', variant: 'classic16' } })))
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic16' } })
+  })
+  it('defaults CREATE variant to classic16 when missing', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1' } })))
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic16' } })
+  })
+  it('falls back CREATE variant to classic16 when invalid (string)', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1', variant: 'classic99' } })))
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic16' } })
+  })
+  it('falls back CREATE variant to classic16 when invalid (number)', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'CREATE', payload: { roomId: 'r1', variant: 42 } })))
+      .toEqual({ ok: true, msg: { type: 'CREATE', roomId: 'r1', variant: 'classic16' } })
+  })
+  it('ignores stray variant on JOIN', () => {
+    expect(parseClientMessage(JSON.stringify({ type: 'JOIN', payload: { roomId: 'r1', variant: 'classic15' } })))
+      .toEqual({ ok: true, msg: { type: 'JOIN', roomId: 'r1' } })
   })
   it('parses PLAY with cards and PASS and RESUME', () => {
     expect(parseClientMessage(JSON.stringify({ type: 'PLAY', payload: { cards: [{ rank: '3', suit: 'D' }] } })))
