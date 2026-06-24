@@ -140,6 +140,40 @@ describe('WsGateway routing', () => {
     expect((lastMsg(s4, 'REJECTED')!.payload as { reason: string }).reason).toBe('NOT_IN_ROOM')
   })
 
+  it('CREATE with variant classic15 opens a 15-card room', async () => {
+    const { gateway } = makeGateway()
+    const socks: FakeSocket[] = []
+    for (const id of ['p1','p2','p3']) {
+      const s = new FakeSocket(); socks.push(s)
+      gateway.handleConnection(s)
+      s.receive(JSON.stringify({ type: 'AUTH', payload: { code: id } }))
+      const arm = id === 'p1'
+        ? { type: 'CREATE', payload: { roomId: 'r15', variant: 'classic15' } }
+        : { type: 'JOIN', payload: { roomId: 'r15' } }
+      s.receive(JSON.stringify(arm))
+      await gateway.idle()
+    }
+    for (const s of socks) {
+      const state = lastMsg(s, 'STATE')
+      expect(state).toBeDefined()
+      const view = state!.payload as { you: { hand: unknown[] } }
+      expect(view.you.hand.length).toBe(15)
+    }
+  })
+
+  it('JOIN to a non-existent room is REJECTED with ROOM_NOT_FOUND and does not create the room', async () => {
+    const { gateway, manager } = makeGateway()
+    const s = new FakeSocket()
+    gateway.handleConnection(s)
+    s.receive(JSON.stringify({ type: 'AUTH', payload: { code: 'p1' } }))
+    s.receive(JSON.stringify({ type: 'JOIN', payload: { roomId: 'ghost' } }))
+    await gateway.idle()
+    const rej = lastMsg(s, 'REJECTED')
+    expect(rej).toBeDefined()
+    expect((rej!.payload as { reason: string }).reason).toBe('ROOM_NOT_FOUND')
+    expect(manager.getRoom('ghost')).toBeUndefined()
+  })
+
   it('a pong on a connection is handled without error when no heartbeat is attached', async () => {
     const { gateway } = makeGateway()
     const s = new FakeSocket()

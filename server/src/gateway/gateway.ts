@@ -87,15 +87,15 @@ export class WsGateway implements Transport {
     const playerId = this.registry.playerOf(connId)!
 
     switch (msg.type) {
-      case 'CREATE':
+      case 'CREATE': {
+        const room = this.manager!.getRoom(msg.roomId) ?? this.manager!.createRoom(msg.roomId, msg.variant)
+        await this.seatPlayer(socket, info, playerId, msg.roomId, room)
+        return
+      }
       case 'JOIN': {
-        const room = this.manager!.getRoom(msg.roomId) ?? this.manager!.createRoom(msg.roomId)
-        const verdict = room.canJoin(playerId)
-        if (!verdict.ok) return this.sendTo(socket, this.reject(verdict.reason))
-        this.registry.joinRoom(playerId, msg.roomId)
-        info.state = 'IN_ROOM'
-        room.enqueue({ type: 'JOIN', playerId })
-        await room.idle()
+        const room = this.manager!.getRoom(msg.roomId)
+        if (!room) return this.sendTo(socket, this.reject('ROOM_NOT_FOUND'))
+        await this.seatPlayer(socket, info, playerId, msg.roomId, room)
         return
       }
       case 'PLAY':
@@ -119,6 +119,16 @@ export class WsGateway implements Transport {
         return
       }
     }
+  }
+
+  // CREATE/JOIN 拿到 room 后的共用逻辑：准入校验、登记、入队 JOIN。
+  private async seatPlayer(socket: Socket, info: ConnInfo, playerId: string, roomId: string, room: import('../room/room').Room): Promise<void> {
+    const verdict = room.canJoin(playerId)
+    if (!verdict.ok) return this.sendTo(socket, this.reject(verdict.reason))
+    this.registry.joinRoom(playerId, roomId)
+    info.state = 'IN_ROOM'
+    room.enqueue({ type: 'JOIN', playerId })
+    await room.idle()
   }
 
   private onClose(connId: number): void {
